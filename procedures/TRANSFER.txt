@@ -1,0 +1,49 @@
+/************************************************************************************
+Descripción: Procedure for doing transfers between stores
+Autor:       Andrea Castrillón Puerta
+Fecha:       11-11-2023
+IdGestión:   TC_GB_02
+@copyright:  MotoPartes
+************************************************************************************/
+
+
+CREATE OR REPLACE PROCEDURE realizar_traspaso (
+   p_transfer_id IN NUMBER,
+   p_product_id IN NUMBER,
+   p_amount IN NUMBER,
+   p_store_origin_id IN NUMBER,
+   p_store_destiny_id IN NUMBER
+) AS
+BEGIN
+   -- Actualizar el inventario para el almacén de origen
+   UPDATE inventory
+   SET amount = amount - p_amount
+   WHERE product_id = p_product_id AND store_id = p_store_origin_id;
+
+   -- Insertar el registro de traspaso en la tabla de transfer
+   INSERT INTO transfer (transfer_id, product_id, amount, store_origin_id, store_destiny_id, create_at)
+   VALUES (p_transfer_id, p_product_id, p_amount, p_store_origin_id, p_store_destiny_id, SYSDATE);
+
+   -- Verificar si hay un registro existente en el inventario para el almacén de destino
+   DECLARE
+      v_count NUMBER;
+   BEGIN
+      SELECT COUNT(*)
+      INTO v_count
+      FROM inventory
+      WHERE product_id = p_product_id AND store_id = p_store_destiny_id;
+
+      -- Si el registro no existe, se crea uno nuevo
+      IF v_count = 0 THEN
+         INSERT INTO inventory (product_id, amount, store_id, stock, available, max_quantity, min_quantity)
+         VALUES (p_product_id, p_amount, p_store_destiny_id, 0, 0, 0, 0);
+      ELSE
+         -- Si el registro ya existe, se actualiza la cantidad
+         UPDATE inventory
+         SET amount = amount + p_amount
+         WHERE product_id = p_product_id AND store_id = p_store_destiny_id;
+      END IF;
+   END;
+   COMMIT;
+END realizar_traspaso;
+/
